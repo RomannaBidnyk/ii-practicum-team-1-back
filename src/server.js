@@ -1,7 +1,7 @@
+require("dotenv").config();
 const { PORT = 8000 } = process.env;
 const app = require("./app");
-const sequelize = require("./db");
-const models = require("./models/models");
+const { sequelize } = require("./models");
 
 const start = async () => {
   try {
@@ -9,13 +9,13 @@ const start = async () => {
     console.log("Database connection has been established successfully.");
 
     await sequelize.sync({ alter: true });
-    console.log("Database synced successfully.");
+    console.log("Models synced successfully.");
 
     app.listen(PORT, () => {
       console.log(`Listening on Port ${PORT}!`);
     });
   } catch (error) {
-    console.error("Unable to connect to the database:", error);
+    console.error("Unable to start server:", error);
   }
 };
 
