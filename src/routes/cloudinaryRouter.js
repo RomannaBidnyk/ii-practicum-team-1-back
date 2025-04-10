@@ -1,20 +1,24 @@
 const express = require("express");
 const router = express.Router();
-const multer = require("multer");
-const path = require("path");
+const upload = require("../middlewares/uploadMiddleware");
 const { uploadImage } = require("../controllers/cloudinaryController");
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
-  },
-});
+const handleMulterErrors = (req, res, next) => {
+  upload.single("image")(req, res, function (err) {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res
+          .status(400)
+          .json({ error: "File too large. Max size is 5MB." });
+      }
+      return res.status(400).json({ error: err.message });
+    } else if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    next();
+  });
+};
 
-const upload = multer({ storage: storage });
-
-router.post("/upload", upload.single("image"), uploadImage); // Upload image to Cloudinary
+router.post("/upload", handleMulterErrors, uploadImage); // Upload image to Cloudinary
 
 module.exports = router;

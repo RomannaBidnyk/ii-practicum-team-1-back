@@ -1,6 +1,4 @@
 const cloudinary = require("../config/cloudinaryConfig");
-const path = require("path");
-const fs = require("fs");
 
 const uploadImage = async (req, res) => {
   try {
@@ -8,15 +6,15 @@ const uploadImage = async (req, res) => {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const imagePath = path.join(__dirname, "../../uploads", req.file.filename); // Path to the uploaded image file
+    // Convert buffer to base64 string
+    const base64Image = `data:${
+      req.file.mimetype
+    };base64,${req.file.buffer.toString("base64")}`;
 
     // Upload to Cloudinary
-    const result = await cloudinary.uploader.upload(imagePath, {
+    const result = await cloudinary.uploader.upload(base64Image, {
       folder: "kindnet", //  folder in Cloudinary - e.g. use test_uploads for testing
     });
-
-    // Delete the temporary image from your server after uploading to Cloudinary
-    fs.unlinkSync(imagePath);
 
     res.json({
       success: true,
