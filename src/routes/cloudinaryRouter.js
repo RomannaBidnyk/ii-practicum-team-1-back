@@ -1,7 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const upload = require("../middleware/uploadMiddleware");
-const { uploadImage } = require("../controllers/cloudinaryController");
+const {
+  uploadImage,
+  deleteImage,
+} = require("../controllers/cloudinaryController");
+const multer = require("multer");
 
 const handleMulterErrors = (req, res, next) => {
   upload.single("image")(req, res, function (err) {
@@ -20,5 +24,6 @@ const handleMulterErrors = (req, res, next) => {
 };
 
 router.post("/upload", handleMulterErrors, uploadImage); // Upload image to Cloudinary
+router.delete("/delete", deleteImage);
 
 module.exports = router;
