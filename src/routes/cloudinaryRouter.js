@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const upload = require("../middlewares/uploadMiddleware");
+const upload = require("../middleware/uploadMiddleware");
 const { uploadImage } = require("../controllers/cloudinaryController");
 
 const handleMulterErrors = (req, res, next) => {
