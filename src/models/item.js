@@ -12,7 +12,6 @@ module.exports = (sequelize) => {
     category_name: {
       type: DataTypes.STRING,
     },
-    photos: { type: DataTypes.JSON },
     item_status: { type: DataTypes.STRING, allowNull: false },
     zip: { type: DataTypes.STRING, allowNull: false },
   }, { timestamps: true });
