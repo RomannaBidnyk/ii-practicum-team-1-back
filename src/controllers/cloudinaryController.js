@@ -14,6 +14,7 @@ const uploadImage = async (req, res) => {
     // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(base64Image, {
       folder: "kindnet", //  folder in Cloudinary - e.g. use test_uploads for testing
+      format: "jpg",
     });
 
     res.json({
