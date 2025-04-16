@@ -5,6 +5,7 @@ const Category = require("./category")(sequelize);
 const Item = require("./item")(sequelize);
 const Transaction = require("./transaction")(sequelize);
 const Feedback = require("./feedback")(sequelize);
+const Image = require("./image")(sequelize);
 
 // Relations
 
@@ -30,6 +31,9 @@ Feedback.belongsTo(User, { foreignKey: "receiver_user_email" });
 Item.hasMany(Feedback, { foreignKey: "item_id" });
 Feedback.belongsTo(Item, { foreignKey: "item_id" });
 
+Item.hasMany(Image, { foreignKey: "item_id", onDelete: "CASCADE" });
+Image.belongsTo(Item, { foreignKey: "item_id" });
+
 module.exports = {
   sequelize,
   User,
@@ -37,4 +41,5 @@ module.exports = {
   Item,
   Transaction,
   Feedback,
+  Image,
 };

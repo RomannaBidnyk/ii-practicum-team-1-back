@@ -1,34 +1,35 @@
 const cloudinary = require("../config/cloudinaryConfig");
 
-const uploadImage = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
-    }
+/**
+ * Requires req.file (must be used after multer middleware)
+ */
+const uploadImageMiddleware = async (req, res, next) => {
+  if (!req.file) {
+    console.error("uploadImageMiddleware used without multer!");
+    return res
+      .status(500)
+      .json({ error: "Server error. Upload middleware misconfiguration." });
+  }
 
-    // Convert buffer to base64 string
+  try {
     const base64Image = `data:${
       req.file.mimetype
     };base64,${req.file.buffer.toString("base64")}`;
 
-    // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(base64Image, {
-      folder: "kindnet", //  folder in Cloudinary - e.g. use test_uploads for testing
+      folder: "kindnet", // specify the folder in Cloudinary
+      format: "jpg", // file format
     });
 
-    res.json({
-      success: true,
-      message: "Image uploaded successfully!",
-      imageUrl: result.secure_url, // URL for the uploaded image https
-      public_id: result.public_id,
-    });
+    req.uploadResult = result; // store the result for further use
+    next(); // continue to the next middleware or route handler
   } catch (error) {
     console.error("Cloudinary upload error:", error);
     res.status(500).json({ error: "Failed to upload image" });
   }
 };
 
-const deleteImage = async (req, res) => {
+const deleteImageMiddleware = async (req, res, next) => {
   const { public_id } = req.body;
 
   if (!public_id) {
@@ -39,14 +40,11 @@ const deleteImage = async (req, res) => {
 
   try {
     await cloudinary.uploader.destroy(public_id);
-    res.json({
-      success: true,
-      message: "Image deleted successfully!",
-    });
+    next(); // continue to the next middleware or route handler
   } catch (error) {
     console.error("Cloudinary deletion error:", error);
     res.status(500).json({ error: "Failed to delete image" });
   }
 };
 
-module.exports = { uploadImage, deleteImage };
+module.exports = { uploadImageMiddleware, deleteImageMiddleware };
