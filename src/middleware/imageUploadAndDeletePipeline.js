@@ -1,10 +1,8 @@
-const express = require("express");
-const router = express.Router();
-const upload = require("../middleware/uploadMiddleware");
 const {
-  uploadImage,
-  deleteImage,
-} = require("../controllers/cloudinaryController");
+  uploadImageMiddleware,
+  deleteImageMiddleware,
+} = require("./cloudinaryMiddleware");
+const upload = require("./uploadMiddleware");
 const multer = require("multer");
 
 const handleMulterErrors = (req, res, next) => {
@@ -23,7 +21,9 @@ const handleMulterErrors = (req, res, next) => {
   });
 };
 
-router.post("/upload", handleMulterErrors, uploadImage); // Upload image to Cloudinary
-router.delete("/delete", deleteImage);
+// This guarantees the right order
+const imageUploadPipeline = [handleMulterErrors, uploadImageMiddleware];
 
-module.exports = router;
+const deleteImagePipeline = [deleteImageMiddleware];
+
+module.exports = { imageUploadPipeline, deleteImagePipeline };
