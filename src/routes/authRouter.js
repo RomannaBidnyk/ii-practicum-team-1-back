@@ -9,4 +9,7 @@ router.post("/logout", authMiddleware, (req, res) => {
   res.status(200).json({ message: `User ${req.user.email} logged out.` });
 });
 
+router.post("/request-password-reset", authController.requestPasswordReset);
+router.post("/reset-password", authController.resetPassword);
+
 module.exports = router;
