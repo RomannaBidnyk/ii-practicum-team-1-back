@@ -6,7 +6,7 @@ const upload = require("./uploadMiddleware");
 const multer = require("multer");
 
 const handleMulterErrors = (req, res, next) => {
-  upload.single("image")(req, res, function (err) {
+  upload.array("image")(req, res, function (err) {
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
         return res
