@@ -4,24 +4,25 @@ const cloudinary = require("../config/cloudinaryConfig");
  * Requires req.file (must be used after multer middleware)
  */
 const uploadImageMiddleware = async (req, res, next) => {
-  if (!req.file) {
-    console.error("uploadImageMiddleware used without multer!");
-    return res
-      .status(500)
-      .json({ error: "Server error. Upload middleware misconfiguration." });
-  }
-
   try {
-    const base64Image = `data:${
-      req.file.mimetype
-    };base64,${req.file.buffer.toString("base64")}`;
+    const files = req.files;
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: "At least one image is required." });
+    }
 
-    const result = await cloudinary.uploader.upload(base64Image, {
-      folder: "kindnet", // specify the folder in Cloudinary
-      format: "jpg", // file format
-    });
+    const cloudinaryUploads = await Promise.all(
+      files.map((file) => {
+        const base64 = `data:${file.mimetype};base64,${file.buffer.toString(
+          "base64"
+        )}`;
+        return cloudinary.uploader.upload(base64, {
+          folder: "kindnet",
+          format: "jpg",
+        });
+      })
+    );
 
-    req.uploadResult = result; // store the result for further use
+    req.cloudinaryImages = cloudinaryUploads;
     next(); // continue to the next middleware or route handler
   } catch (error) {
     console.error("Cloudinary upload error:", error);
