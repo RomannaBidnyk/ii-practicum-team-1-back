@@ -1,4 +1,4 @@
-const { Item, Image } = require("../models");
+const { Item, User, Category, Image } = require("../models");
 const cloudinary = require("../config/cloudinaryConfig");
 
 const createItem = async (req, res) => {
@@ -53,7 +53,41 @@ const createItem = async (req, res) => {
     }
 
     return res.status(500).json({ error: "Failed to create item" });
+  }  
+};
+
+const getAllItems = async (req, res) => {
+  try {
+    const {category} = req.query;
+    const whereConditions = {};
+    if(category) {
+      whereConditions.category_name = category;
+    }
+
+    const items = await Item.findAll({
+      where: whereConditions,  
+      include: [
+        {
+          model: User,
+          attributes: ["email", "first_name", "last_name"],
+        },
+        {
+          model: Category,
+          attributes: ["category_name"],
+        },
+        {
+          model: Image,
+          attributes: ["public_id", "image_url"],
+        }
+      ],
+      order: [['createdAt', "DESC"]],  
+    });
+
+    return res.status(200).json({ items, count: items.length });
+  } catch (error) {
+    console.error("Error fetching items:", error);
+    return res.status(500).json({ error: "Failed to fetch items" });
   }
 };
 
-module.exports = { createItem };
+module.exports = { createItem , getAllItems};
