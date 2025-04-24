@@ -1,7 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
-const { createItem, getAllItems } = require("../controllers/itemController");
+const {
+  createItem,
+  getAllItems,
+  deleteItem,
+} = require("../controllers/itemController");
 const {
   imageUploadPipeline,
   deleteImagePipeline,
@@ -14,5 +18,6 @@ router.get("/private", authMiddleware, (req, res) => {
 router.get("/", getAllItems);
 
 router.post("/", authMiddleware, imageUploadPipeline, createItem);
+router.delete("/:id", authMiddleware, deleteItem);
 
 module.exports = router;
