@@ -53,19 +53,58 @@ const createItem = async (req, res) => {
     }
 
     return res.status(500).json({ error: "Failed to create item" });
-  }  
+  }
+};
+
+const deleteItem = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const item = await Item.findOne({
+      where: { item_id: id },
+      include: [Image],
+    });
+
+    if (!item) {
+      return res.status(404).json({ error: "Item not found" });
+    }
+
+    console.log("Item with images:", item);
+
+    // Check if the authenticated user owns the item
+    if (req.user.email !== item.user_email) {
+      return res
+        .status(403)
+        .json({ error: "Unauthorized to delete this item" });
+    }
+
+    // Delete all associated images from Cloudinary
+    await Promise.all(
+      item.images.map((img) =>
+        cloudinary.uploader.destroy(img.dataValues.public_id)
+      )
+    );
+
+    await Image.destroy({ where: { item_id: id } });
+    await Item.destroy({ where: { item_id: id } });
+
+    return res.status(200).json({ message: "Item deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting item:", error);
+    return res.status(500).json({ error: "Failed to delete item" });
+  }
 };
 
 const getAllItems = async (req, res) => {
   try {
-    const {category} = req.query;
+    const { category } = req.query;
     const whereConditions = {};
-    if(category) {
+    if (category) {
       whereConditions.category_name = category;
     }
 
     const items = await Item.findAll({
-      where: whereConditions,  
+      where: whereConditions,
       include: [
         {
           model: User,
@@ -78,9 +117,9 @@ const getAllItems = async (req, res) => {
         {
           model: Image,
           attributes: ["public_id", "image_url"],
-        }
+        },
       ],
-      order: [['createdAt', "DESC"]],  
+      order: [["createdAt", "DESC"]],
     });
 
     return res.status(200).json({ items, count: items.length });
@@ -90,4 +129,4 @@ const getAllItems = async (req, res) => {
   }
 };
 
-module.exports = { createItem , getAllItems};
+module.exports = { createItem, getAllItems, deleteItem };
