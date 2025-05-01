@@ -1,5 +1,7 @@
 const { Item, User, Category, Image } = require("../models");
 const cloudinary = require("../config/cloudinaryConfig");
+const { Op } = require("sequelize");
+const { BadRequestError } = require("../errors");
 const { sequelize } = require("../models");
 
 const createItem = async (req, res) => {
@@ -96,14 +98,29 @@ const deleteItem = async (req, res) => {
   }
 };
 
-const getAllItems = async (req, res) => {
+const getAllItems = async (req, res, next) => {
   try {
-    const { category } = req.query;
+    const { category, search } = req.query;
     const whereConditions = {};
+
     if (category) {
       whereConditions.category_name = category;
     }
 
+    if (search && typeof search === "string") {
+      const trimmedSearch = search.trim();
+
+      if (trimmedSearch.length >= 2 && trimmedSearch.length <= 100) {
+        const escapedSearch = trimmedSearch.replace(
+          /[%_\\]/g,
+          (char) => `\\${char}`
+        );
+        whereConditions[Op.or] = [
+          { title: { [Op.iLike]: `%${escapedSearch}%` } },
+          { description: { [Op.iLike]: `%${escapedSearch}%` } },
+        ];
+      }
+    }
     const items = await Item.findAll({
       where: whereConditions,
       include: [
@@ -123,11 +140,17 @@ const getAllItems = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    return res.status(200).json({ items, count: items.length });
-  } catch (error) {
-    console.error("Error fetching items:", error);
-    return res.status(500).json({ error: "Failed to fetch items" });
-  }
+    return res.status(200).json({
+      items,
+      count: items.length,
+      filters: {
+        category: category || null,
+        search: search || null,
+      },
+    });
+  } catch (err) {
+    console.error("Error fetching items:", err);
+    next(err);
 };
 
 const updateItem = async (req, res) => {
