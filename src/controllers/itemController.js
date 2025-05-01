@@ -2,6 +2,7 @@ const { Item, User, Category, Image } = require("../models");
 const cloudinary = require("../config/cloudinaryConfig");
 const { Op } = require("sequelize");
 const { BadRequestError } = require("../errors");
+const { sequelize } = require("../models");
 
 const createItem = async (req, res) => {
   const t = await Item.sequelize.transaction();
@@ -153,4 +154,114 @@ const getAllItems = async (req, res, next) => {
   }
 };
 
-module.exports = { createItem, getAllItems, deleteItem };
+const updateItem = async (req, res) => {
+  const id = req.params.id;
+  const userId = req.user.id;
+  const { title, description, zip, item_status, category_name } = req.body;
+
+  const t = await sequelize.transaction();
+
+  try {
+    const item = await Item.findByPk(id, {
+      include: [{ model: Image }],
+    });
+
+    if (!item) {
+      return res.status(404).json({ error: "Item not found" });
+    }
+
+    if (item.user_id !== userId) {
+      return res
+        .status(403)
+        .json({ error: "You can only update your own items" });
+    }
+
+    let category = null;
+    if (category_name) {
+      category = await Category.findOne({ where: { category_name } });
+      if (!category) {
+        return res.status(400).json({ error: "Invalid category" });
+      }
+    }
+
+    // Delete selected images (if any)
+
+    let deleteList = req.body.deleteList;
+
+    if (typeof deleteList === "string") {
+      try {
+        deleteList = JSON.parse(deleteList);
+      } catch (e) {
+        console.error("Failed to parse deleteList:", e);
+        deleteList = [];
+      }
+    }
+
+    console.log("Images ids to delete:", deleteList);
+    if (deleteList && Array.isArray(deleteList)) {
+      const imagesToDelete = item.images.filter((img) => {
+        const isInDeleteList = deleteList.includes(img.public_id);
+        const belongsToItem = img.item_id === item.item_id;
+        return isInDeleteList && belongsToItem;
+      });
+      if (imagesToDelete.length !== deleteList.length) {
+        return res
+          .status(400)
+          .json({ error: "Some images to delete do not belong to this item." });
+      }
+
+      // Delete from Cloudinary
+      await Promise.all(
+        imagesToDelete.map((img) => cloudinary.uploader.destroy(img.public_id))
+      );
+
+      // Delete from DB
+      await Image.destroy({
+        where: {
+          public_id: deleteList,
+          item_id: id,
+        },
+        transaction: t,
+      });
+    }
+
+    // Upload new images from req.cloudinaryImages
+    const uploadedImages = req.cloudinaryImages || [];
+    const newImagesData = uploadedImages.map((img) => ({
+      item_id: item.item_id,
+      image_url: img.secure_url,
+      public_id: img.public_id,
+    }));
+
+    if (newImagesData.length > 0) {
+      await Image.bulkCreate(newImagesData, { transaction: t });
+    }
+
+    // Update item fields
+    await item.update(
+      {
+        title: title ?? item.title,
+        description: description ?? item.description,
+        zip: zip ?? item.zip,
+        item_status: item_status ?? item.item_status,
+        category_id: category ? category.category_id : item.category_id,
+      },
+      { transaction: t }
+    );
+
+    await t.commit();
+
+    // Return updated item with images
+    const updatedItem = await Item.findByPk(id, {
+      include: [{ model: Image }],
+    });
+
+    res.json(updatedItem);
+  } catch (error) {
+    await t.rollback();
+    console.error("Update item error:", error);
+    res.status(500).json({ error: "Failed to update item" });
+  }
+};
+
+module.exports = { createItem, getAllItems, deleteItem, updateItem };
