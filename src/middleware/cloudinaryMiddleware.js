@@ -6,6 +6,13 @@ const cloudinary = require("../config/cloudinaryConfig");
 const uploadImageMiddleware = async (req, res, next) => {
   try {
     const files = req.files;
+
+    // If it's a PUT request and no files are uploaded, just continue
+    if (req.method === "PUT" && (!files || files.length === 0)) {
+      req.cloudinaryImages = []; // no new images
+      return next();
+    }
+
     if (!files || files.length === 0) {
       return res.status(400).json({ error: "At least one image is required." });
     }

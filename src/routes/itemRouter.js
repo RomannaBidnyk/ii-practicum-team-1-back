@@ -5,6 +5,7 @@ const {
   createItem,
   getAllItems,
   deleteItem,
+  updateItem,
 } = require("../controllers/itemController");
 const {
   imageUploadPipeline,
@@ -19,5 +20,6 @@ router.get("/", getAllItems);
 
 router.post("/", authMiddleware, imageUploadPipeline, createItem);
 router.delete("/:id", authMiddleware, deleteItem);
+router.put("/:id", authMiddleware, imageUploadPipeline, updateItem);
 
 module.exports = router;
