@@ -151,6 +151,7 @@ const getAllItems = async (req, res, next) => {
   } catch (err) {
     console.error("Error fetching items:", err);
     next(err);
+  }
 };
 
 const updateItem = async (req, res) => {
