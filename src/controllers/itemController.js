@@ -100,7 +100,19 @@ const deleteItem = async (req, res) => {
 
 const getAllItems = async (req, res, next) => {
   try {
-    const { category, search } = req.query;
+    const { category, search, limit=12, offset=0 } = req.query;
+
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+
+    const finalLimit = !isNaN(parsedLimit) && parsedLimit > 0 && parsedLimit <= 100 
+    ? parsedLimit 
+    : 12;
+
+    const finalOffset = !isNaN(parsedOffset) && parsedOffset >= 0 
+    ? parsedOffset 
+    : 0;
+
     const whereConditions = {};
 
     if (category) {
@@ -121,6 +133,11 @@ const getAllItems = async (req, res, next) => {
         ];
       }
     }
+
+    const totalItems = await Item.count({
+      where: whereConditions
+    });
+
     const items = await Item.findAll({
       where: whereConditions,
       include: [
@@ -138,11 +155,24 @@ const getAllItems = async (req, res, next) => {
         },
       ],
       order: [["createdAt", "DESC"]],
+      limit: finalLimit,
+      offset: finalOffset
     });
+
+    const totalPages = Math.ceil(totalItems / finalLimit);
+    const currentPage = Math.floor(finalOffset / finalLimit) + 1;
 
     return res.status(200).json({
       items,
       count: items.length,
+      pagination: {
+        total_items: totalItems,
+        total_pages: totalPages,
+        current_page: currentPage,
+        items_per_page: finalLimit,
+        has_next_page: currentPage < totalPages,
+        has_prev_page: currentPage > 1
+      },
       filters: {
         category: category || null,
         search: search || null,
