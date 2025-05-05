@@ -6,8 +6,8 @@ const { sequelize } = require("../models");
 
 const createItem = async (req, res) => {
   const t = await Item.sequelize.transaction();
-  const { title, description, category_name, zip, item_status, user_email } =
-    req.body;
+  const { title, description, category_name, zip, item_status } = req.body;
+  const user_email = req.user.email;
 
   const cloudinaryImages = req.cloudinaryImages;
 
@@ -100,18 +100,18 @@ const deleteItem = async (req, res) => {
 
 const getAllItems = async (req, res, next) => {
   try {
-    const { category, search, limit=12, offset=0 } = req.query;
+    const { category, search, limit = 12, offset = 0 } = req.query;
 
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
 
-    const finalLimit = !isNaN(parsedLimit) && parsedLimit > 0 && parsedLimit <= 100 
-    ? parsedLimit 
-    : 12;
+    const finalLimit =
+      !isNaN(parsedLimit) && parsedLimit > 0 && parsedLimit <= 100
+        ? parsedLimit
+        : 12;
 
-    const finalOffset = !isNaN(parsedOffset) && parsedOffset >= 0 
-    ? parsedOffset 
-    : 0;
+    const finalOffset =
+      !isNaN(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
 
     const whereConditions = {};
 
@@ -135,7 +135,7 @@ const getAllItems = async (req, res, next) => {
     }
 
     const totalItems = await Item.count({
-      where: whereConditions
+      where: whereConditions,
     });
 
     const items = await Item.findAll({
@@ -156,7 +156,7 @@ const getAllItems = async (req, res, next) => {
       ],
       order: [["createdAt", "DESC"]],
       limit: finalLimit,
-      offset: finalOffset
+      offset: finalOffset,
     });
 
     const totalPages = Math.ceil(totalItems / finalLimit);
@@ -171,7 +171,7 @@ const getAllItems = async (req, res, next) => {
         current_page: currentPage,
         items_per_page: finalLimit,
         has_next_page: currentPage < totalPages,
-        has_prev_page: currentPage > 1
+        has_prev_page: currentPage > 1,
       },
       filters: {
         category: category || null,
