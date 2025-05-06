@@ -12,6 +12,7 @@ const getUserInfo = async (req, res) => {
         "last_name",
         "phone_number",
         "zip_code",
+        "avatar_url",
       ],
     });
 
