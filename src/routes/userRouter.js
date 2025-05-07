@@ -6,10 +6,10 @@ const {
   updateUserInfo,
 } = require("../controllers/userController");
 const {
-  imageUploadPipeline,
+  singleImageUploadPipeline,
 } = require("../middleware/imageUploadAndDeletePipeline");
 
 router.get("/info", authMiddleware, getUserInfo);
-router.put("/info", authMiddleware, imageUploadPipeline, updateUserInfo);
+router.put("/info", authMiddleware, singleImageUploadPipeline, updateUserInfo);
 
 module.exports = router;

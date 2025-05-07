@@ -21,9 +21,25 @@ const handleMulterErrors = (req, res, next) => {
   });
 };
 
+const hasOneImage = (req, res, next) => {
+  if (req.files && req.files.length > 1) {
+    return res.status(400).json({ error: "Only one image is allowed." });
+  }
+  next();
+};
+
 // This guarantees the right order
 const imageUploadPipeline = [handleMulterErrors, uploadImageMiddleware];
+const singleImageUploadPipeline = [
+  handleMulterErrors, // multer runs here
+  hasOneImage, // then we check number of files
+  uploadImageMiddleware,
+];
 
 const deleteImagePipeline = [deleteImageMiddleware];
 
-module.exports = { imageUploadPipeline, deleteImagePipeline };
+module.exports = {
+  imageUploadPipeline,
+  deleteImagePipeline,
+  singleImageUploadPipeline,
+};
