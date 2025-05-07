@@ -17,6 +17,7 @@ router.get("/private", authMiddleware, (req, res) => {
 });
 
 router.get("/", authMiddleware, getAllItems);
+router.get("/:id", authMiddleware, getItemById);
 router.post("/", authMiddleware, imageUploadPipeline, createItem);
 router.delete("/:id", authMiddleware, deleteItem);
 router.put("/:id", authMiddleware, imageUploadPipeline, updateItem);
