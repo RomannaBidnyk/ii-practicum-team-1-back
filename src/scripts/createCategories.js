@@ -1,14 +1,20 @@
 const { Category, sequelize } = require('../models');
 
 const categories = [
-  'furniture',
-  'electronics',
-  'clothing',
-  'books',
-  'toys',
-  'kitchen',
-  'sports',
-  'other'
+  "Books",
+  "Toys",
+  "Furniture",
+  "Fitness",
+  "Home",
+  "Kids",
+  "Appliances",
+  "Decor",
+  "Clothing",
+  "Electronics",
+  "Garden",
+  "Art Supplies",
+  "Storage",
+  "Tools"
 ];
 
 async function createCategories() {

@@ -4,6 +4,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 const {
   createItem,
   getAllItems,
+  getItemById,
   deleteItem,
   updateItem,
 } = require("../controllers/itemController");
