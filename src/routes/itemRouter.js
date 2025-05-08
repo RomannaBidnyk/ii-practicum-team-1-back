@@ -4,6 +4,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 const {
   createItem,
   getAllItems,
+  getItemById,
   deleteItem,
   updateItem,
 } = require("../controllers/itemController");
@@ -16,8 +17,8 @@ router.get("/private", authMiddleware, (req, res) => {
   res.json({ message: `Hello, ${req.user.email}. You are authorized.` });
 });
 
-router.get("/", getAllItems);
-
+router.get("/", authMiddleware, getAllItems);
+router.get("/:id", authMiddleware, getItemById);
 router.post("/", authMiddleware, imageUploadPipeline, createItem);
 router.delete("/:id", authMiddleware, deleteItem);
 router.put("/:id", authMiddleware, imageUploadPipeline, updateItem);

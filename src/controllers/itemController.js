@@ -184,6 +184,43 @@ const getAllItems = async (req, res, next) => {
   }
 };
 
+const getItemById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const itemId = parseInt(id, 10);
+    if (isNaN(itemId)) {
+      return res.status(400).json({ error: "Item ID must be a number" });
+    }    
+
+    const item = await Item.findByPk(itemId, {
+      include: [
+        {
+          model: User,
+          attributes: ["email", "first_name", "last_name"],
+        },
+        {
+          model: Category,
+          attributes: ["category_name"],
+        },
+        {
+          model: Image,
+          attributes: ["public_id", "image_url"],
+        },
+      ],
+    });
+
+    if (!item) {
+      return res.status(404).json({ error: "Item not found" });
+    }
+    
+    return res.status(200).json({ item });
+  } catch (err) {
+    console.error("Error fetching item:", err);
+    next(err);
+  }
+};
+
 const updateItem = async (req, res) => {
   const id = req.params.id;
   const userId = req.user.id;
@@ -294,4 +331,4 @@ const updateItem = async (req, res) => {
   }
 };
 
-module.exports = { createItem, getAllItems, deleteItem, updateItem };
+module.exports = { createItem, getAllItems, getItemById, deleteItem, updateItem };
