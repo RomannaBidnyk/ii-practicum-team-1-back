@@ -7,10 +7,11 @@ const loginSchema = require("../validators/loginValidator");
 const resetPasswordRequestSchema = require("../validators/resetPasswordRequestValidator");
 const resetPasswordSchema = require("../validators/resetPasswordValidator");
 const { BadRequestError, UnauthenticatedError } = require("../errors");
+const { PasswordResetToken } = require("../models");
+const { sendPasswordResetEmail } = require("../services/emailService");
+const { Op } = require("sequelize");
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
-
-const passwordResetTokens = new Map();
 
 const authController = {
   async register(req, res, next) {
@@ -97,73 +98,86 @@ const authController = {
 
     try {
       const user = await User.findByPk(email.toLowerCase());
+      const responseMessage = "If your email exists in our system, you will receive reset instructions.";
       if (!user) {        
-        return res.status(200).json({
-          message: "If your email exists in our system, you will receive reset instructions."
-        });
+        return res.status(200).json({ message: responseMessage });
       }
      
-      const resetToken = crypto.randomBytes(32).toString('hex');      
+      const resetToken = crypto.randomBytes(32).toString('hex');  
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');   
+      
+      await PasswordResetToken.destroy({ 
+        where: { email: email.toLowerCase() } 
+      });
      
-      passwordResetTokens.set(email.toLowerCase(), {
-        token: resetToken,
-        expires: Date.now() + 3600000 // 1 hour in milliseconds
+      await PasswordResetToken.create({
+        email: email.toLowerCase(),
+        token: hashedToken,
+        expires_at: new Date(Date.now() + 3600000) 
       });
 
-      // In a production  we will send this token via email?     
-      return res.status(200).json({
-        message: "If your email exists in our system, you will receive reset instructions.",
-        // ONLY FOR TESTING 
-        token: resetToken
-      });
+      const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}&email=${email}`;
+    
+      // Send email
+      await sendPasswordResetEmail(email, resetUrl);
+      
+      return res.status(200).json({ message: responseMessage });
     } catch (err) {
       console.error("Password reset request error:", err);
       next(err);
     }
   },
 
-  async resetPassword(req, res, next) {
-    const { error, value } = resetPasswordSchema.validate(req.body);
-    if (error) {
-      return res.status(400).json({ message: error.details[0].message });
-    }
-
-    const { email, token, newPassword } = value;
-    const lowerEmail = email.toLowerCase();
-
-    try {      
-      const resetData = passwordResetTokens.get(lowerEmail);
-      
-      if (!resetData || resetData.token !== token) {
-        return res.status(400).json({ message: "Invalid or expired token" });
-      }
-
-      if (resetData.expires < Date.now()) {
-        passwordResetTokens.delete(lowerEmail);
-        return res.status(400).json({ message: "Token has expired" });
-      }
-
-      const user = await User.findByPk(lowerEmail);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      if (await bcrypt.compare(newPassword, user.password)) {
-        return res.status(400).json({ message: "New password must be different from the old one" });
-      }
-
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-      await user.update({ password: hashedPassword });
- 
-      passwordResetTokens.delete(lowerEmail);
-
-      return res.status(200).json({ message: "Password reset successful" });
-    } catch (err) {
-      console.error("Password reset error:", err);
-      next(err);
-    }
+async resetPassword(req, res, next) {
+  const { error, value } = resetPasswordSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({ message: error.details[0].message });
   }
+
+  const { token, newPassword } = value;
+  
+  try {
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    
+    const resetToken = await PasswordResetToken.findOne({
+      where: {
+        token: hashedToken,
+        expires_at: { [Op.gt]: new Date() }
+      }
+    });
+    
+    if (!resetToken) {
+      return res.status(400).json({ message: "This password reset link is invalid or has expired. Please request a new one." });
+    }
+    
+    const userEmail = resetToken.email;
+    
+    const user = await User.findByPk(userEmail);
+    if (!user) {
+      return res.status(404).json({ message: "User account not found. Please contact support." });
+    }
+
+    if (await bcrypt.compare(newPassword, user.password)) {
+      return res.status(400).json({ message: "Your new password cannot be the same as your current password. Please choose a different password." });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await user.update({ password: hashedPassword });
+
+    await PasswordResetToken.destroy({ 
+      where: { email: userEmail } 
+    });
+
+    return res.status(200).json({ 
+      message: "Your password has been successfully reset. You can now log in with your new password." 
+    });
+  } catch (err) {
+    console.error("Password reset error:", err);    
+    return res.status(500).json({ 
+      message: "An error occurred while resetting your password. Please try again or contact support." 
+    });
+  }
+}
 };
 
 module.exports = authController;
