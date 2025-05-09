@@ -3,6 +3,7 @@ const cloudinary = require("../config/cloudinaryConfig");
 const { Op } = require("sequelize");
 const { BadRequestError } = require("../errors");
 const { sequelize } = require("../models");
+const { itemSearchSchema } = require("../validators/zipValidator");
 
 const createItem = async (req, res) => {
   const t = await Item.sequelize.transaction();
@@ -100,38 +101,33 @@ const deleteItem = async (req, res) => {
 
 const getAllItems = async (req, res, next) => {
   try {
-    const { category, search, limit = 12, offset = 0 } = req.query;
+    const { error, value } = itemSearchSchema.validate(req.query);
+    
+    if (error) {
+      return res.status(400).json({ message: error.details[0].message });
+    } 
 
-    const parsedLimit = parseInt(limit, 10);
-    const parsedOffset = parseInt(offset, 10);
-
-    const finalLimit =
-      !isNaN(parsedLimit) && parsedLimit > 0 && parsedLimit <= 100
-        ? parsedLimit
-        : 12;
-
-    const finalOffset =
-      !isNaN(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
+    const { category, search, zip, limit, offset } = value;    
 
     const whereConditions = {};
-
+    
     if (category) {
       whereConditions.category_name = category;
     }
+    
+    if (zip) {
+      whereConditions.zip = zip;
+    }
 
-    if (search && typeof search === "string") {
-      const trimmedSearch = search.trim();
-
-      if (trimmedSearch.length >= 2 && trimmedSearch.length <= 100) {
-        const escapedSearch = trimmedSearch.replace(
-          /[%_\\]/g,
-          (char) => `\\${char}`
-        );
-        whereConditions[Op.or] = [
-          { title: { [Op.iLike]: `%${escapedSearch}%` } },
-          { description: { [Op.iLike]: `%${escapedSearch}%` } },
-        ];
-      }
+    if (search) {
+      const escapedSearch = search.replace(
+        /[%_\\]/g,
+        (char) => `\\${char}`
+      );
+      whereConditions[Op.or] = [
+        { title: { [Op.iLike]: `%${escapedSearch}%` } },
+        { description: { [Op.iLike]: `%${escapedSearch}%` } },
+      ];
     }
 
     const totalItems = await Item.count({
@@ -155,12 +151,12 @@ const getAllItems = async (req, res, next) => {
         },
       ],
       order: [["createdAt", "DESC"]],
-      limit: finalLimit,
-      offset: finalOffset,
+      limit,  
+      offset,
     });
 
-    const totalPages = Math.ceil(totalItems / finalLimit);
-    const currentPage = Math.floor(finalOffset / finalLimit) + 1;
+    const totalPages = Math.ceil(totalItems / limit);
+    const currentPage = Math.floor(offset / limit) + 1;
 
     return res.status(200).json({
       items,
@@ -169,13 +165,14 @@ const getAllItems = async (req, res, next) => {
         total_items: totalItems,
         total_pages: totalPages,
         current_page: currentPage,
-        items_per_page: finalLimit,
+        items_per_page: limit,
         has_next_page: currentPage < totalPages,
         has_prev_page: currentPage > 1,
       },
       filters: {
         category: category || null,
         search: search || null,
+        zip: zip || null, 
       },
     });
   } catch (err) {
