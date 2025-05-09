@@ -102,28 +102,25 @@ const deleteItem = async (req, res) => {
 const getAllItems = async (req, res, next) => {
   try {
     const { error, value } = itemSearchSchema.validate(req.query);
-    
+
     if (error) {
       return res.status(400).json({ message: error.details[0].message });
-    } 
+    }
 
-    const { category, search, zip, limit, offset } = value;    
+    const { category, search, zip, limit, offset } = value;
 
     const whereConditions = {};
-    
+
     if (category) {
       whereConditions.category_name = category;
     }
-    
+
     if (zip) {
       whereConditions.zip = zip;
     }
 
     if (search) {
-      const escapedSearch = search.replace(
-        /[%_\\]/g,
-        (char) => `\\${char}`
-      );
+      const escapedSearch = search.replace(/[%_\\]/g, (char) => `\\${char}`);
       whereConditions[Op.or] = [
         { title: { [Op.iLike]: `%${escapedSearch}%` } },
         { description: { [Op.iLike]: `%${escapedSearch}%` } },
@@ -139,7 +136,7 @@ const getAllItems = async (req, res, next) => {
       include: [
         {
           model: User,
-          attributes: ["email", "first_name", "last_name"],
+          attributes: ["email", "first_name", "last_name", "avatar_url"],
         },
         {
           model: Category,
@@ -151,7 +148,7 @@ const getAllItems = async (req, res, next) => {
         },
       ],
       order: [["createdAt", "DESC"]],
-      limit,  
+      limit,
       offset,
     });
 
@@ -172,7 +169,7 @@ const getAllItems = async (req, res, next) => {
       filters: {
         category: category || null,
         search: search || null,
-        zip: zip || null, 
+        zip: zip || null,
       },
     });
   } catch (err) {
@@ -188,7 +185,7 @@ const getItemById = async (req, res, next) => {
     const itemId = parseInt(id, 10);
     if (isNaN(itemId)) {
       return res.status(400).json({ error: "Item ID must be a number" });
-    }    
+    }
 
     const item = await Item.findByPk(itemId, {
       include: [
@@ -210,7 +207,7 @@ const getItemById = async (req, res, next) => {
     if (!item) {
       return res.status(404).json({ error: "Item not found" });
     }
-    
+
     return res.status(200).json({ item });
   } catch (err) {
     console.error("Error fetching item:", err);
@@ -328,4 +325,10 @@ const updateItem = async (req, res) => {
   }
 };
 
-module.exports = { createItem, getAllItems, getItemById, deleteItem, updateItem };
+module.exports = {
+  createItem,
+  getAllItems,
+  getItemById,
+  deleteItem,
+  updateItem,
+};
