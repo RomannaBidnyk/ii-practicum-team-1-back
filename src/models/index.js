@@ -6,6 +6,7 @@ const Item = require("./item")(sequelize);
 const Transaction = require("./transaction")(sequelize);
 const Feedback = require("./feedback")(sequelize);
 const Image = require("./image")(sequelize);
+const PasswordResetToken = require("./passwordResetToken")(sequelize);
 
 // Relations
 
@@ -42,4 +43,5 @@ module.exports = {
   Transaction,
   Feedback,
   Image,
+  PasswordResetToken,
 };
