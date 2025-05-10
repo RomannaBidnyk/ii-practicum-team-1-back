@@ -2,10 +2,11 @@ const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/authController");
 const authMiddleware = require("../middleware/authMiddleware");
-//const validateResetToken = require("../middleware/validateResetToken");
+const { loginLimiter, registerLimiter } = require("../middleware/rateLimiter");
 
-router.post("/register", authController.register);
-router.post("/login", authController.login);
+router.post("/register",registerLimiter,  authController.register);
+router.post("/login", loginLimiter, authController.login);
+router.get("/verify-email", authController.verifyEmail);
 router.post("/logout", authMiddleware, (req, res) => {
   res.status(200).json({ message: `User ${req.user.email} logged out.` });
 });
