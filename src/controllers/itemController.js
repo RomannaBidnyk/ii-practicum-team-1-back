@@ -200,7 +200,7 @@ const getItemById = async (req, res, next) => {
       include: [
         {
           model: User,
-          attributes: ["email", "first_name", "last_name"],
+          attributes: ["email", "first_name", "last_name", "avatar_url"],
         },
         {
           model: Category,
