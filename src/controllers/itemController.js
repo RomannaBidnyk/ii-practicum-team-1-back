@@ -7,7 +7,8 @@ const { itemSearchSchema } = require("../validators/zipValidator");
 
 const createItem = async (req, res) => {
   const t = await Item.sequelize.transaction();
-  const { title, description, category_name, zip, item_status } = req.body;
+  const { title, description, category_name, zip, item_status, can_deliver } =
+    req.body;
   const user_email = req.user.email;
 
   const cloudinaryImages = req.cloudinaryImages;
@@ -18,7 +19,15 @@ const createItem = async (req, res) => {
 
   try {
     const item = await Item.create(
-      { title, description, category_name, zip, item_status, user_email },
+      {
+        title,
+        description,
+        category_name,
+        zip,
+        item_status,
+        user_email,
+        can_deliver: can_deliver === undefined ? false : can_deliver,
+      },
       { transaction: t }
     );
 
@@ -218,7 +227,8 @@ const getItemById = async (req, res, next) => {
 const updateItem = async (req, res) => {
   const id = req.params.id;
   const userId = req.user.id;
-  const { title, description, zip, item_status, category_name } = req.body;
+  const { title, description, zip, item_status, category_name, can_deliver } =
+    req.body;
 
   const t = await sequelize.transaction();
 
@@ -306,6 +316,7 @@ const updateItem = async (req, res) => {
         zip: zip ?? item.zip,
         item_status: item_status ?? item.item_status,
         category_id: category ? category.category_id : item.category_id,
+        can_deliver: can_deliver ?? item.can_deliver,
       },
       { transaction: t }
     );
