@@ -153,7 +153,7 @@ const getAllItems = async (req, res, next) => {
         },
         {
           model: Image,
-          attributes: ["public_id", "image_url"],
+          attributes: ["id", "image_url"],
         },
       ],
       order: [["createdAt", "DESC"]],
@@ -208,7 +208,7 @@ const getItemById = async (req, res, next) => {
         },
         {
           model: Image,
-          attributes: ["public_id", "image_url"],
+          attributes: ["id", "image_url"],
         },
       ],
     });
@@ -271,9 +271,8 @@ const updateItem = async (req, res) => {
     console.log("Images ids to delete:", deleteList);
     if (deleteList && Array.isArray(deleteList)) {
       const imagesToDelete = item.images.filter((img) => {
-        const isInDeleteList = deleteList.includes(img.public_id);
-        const belongsToItem = img.item_id === item.item_id;
-        return isInDeleteList && belongsToItem;
+        const isInDeleteList = deleteList.includes(img.id);
+        return isInDeleteList;
       });
       if (imagesToDelete.length !== deleteList.length) {
         return res
@@ -289,7 +288,7 @@ const updateItem = async (req, res) => {
       // Delete from DB
       await Image.destroy({
         where: {
-          public_id: deleteList,
+          id: deleteList,
           item_id: id,
         },
         transaction: t,
@@ -325,7 +324,7 @@ const updateItem = async (req, res) => {
 
     // Return updated item with images
     const updatedItem = await Item.findByPk(id, {
-      include: [{ model: Image }],
+      include: [{ model: Image, attributes: ["id", "image_url"] }],
     });
 
     res.json(updatedItem);
