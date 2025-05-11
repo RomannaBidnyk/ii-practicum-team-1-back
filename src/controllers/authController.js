@@ -9,7 +9,10 @@ const resetPasswordSchema = require("../validators/resetPasswordValidator");
 const { BadRequestError, UnauthenticatedError } = require("../errors");
 const { PasswordResetToken } = require("../models");
 const { Op } = require("sequelize");
-const { sendPasswordResetEmail, sendVerificationEmail } = require("../services/emailService");
+const {
+  sendPasswordResetEmail,
+  sendVerificationEmail,
+} = require("../services/emailService");
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
@@ -50,6 +53,7 @@ const authController = {
       const {
         password: _,
         verification_token: __,
+        avatar_public_id: ___,
         ...userWithoutPassword
       } = newUser.toJSON();
 
@@ -126,30 +130,34 @@ const authController = {
       const isPasswordValid = await bcrypt.compare(password, user.password);
 
       if (!isPasswordValid) {
-      const failedAttempts = user.failed_login_attempts + 1;
-      const updateData = { failed_login_attempts: failedAttempts };
-      
-      if (failedAttempts >= 5) {
-        updateData.locked_until = new Date(Date.now() + 30 * 60 * 1000);
-      }
-      
-      await user.update(updateData);
-      
-      throw new UnauthenticatedError("Invalid email or password");
-    }
+        const failedAttempts = user.failed_login_attempts + 1;
+        const updateData = { failed_login_attempts: failedAttempts };
 
-        if (user.failed_login_attempts > 0) {
-      await user.update({ 
-        failed_login_attempts: 0,
-        locked_until: null 
-      });
-    }
+        if (failedAttempts >= 5) {
+          updateData.locked_until = new Date(Date.now() + 30 * 60 * 1000);
+        }
+
+        await user.update(updateData);
+
+        throw new UnauthenticatedError("Invalid email or password");
+      }
+
+      if (user.failed_login_attempts > 0) {
+        await user.update({
+          failed_login_attempts: 0,
+          locked_until: null,
+        });
+      }
 
       const token = jwt.sign({ email: user.email }, JWT_SECRET, {
         expiresIn: "2h",
       });
 
-      const { password: _, ...userWithoutPassword } = user.toJSON();
+      const {
+        password: _,
+        avatar_public_id: __,
+        ...userWithoutPassword
+      } = user.toJSON();
 
       res.status(200).json({
         message: "Login successful",
