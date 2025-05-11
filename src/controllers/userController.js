@@ -1,5 +1,6 @@
 const { User } = require("../models");
 const cloudinary = require("../config/cloudinaryConfig");
+const updateUserValidator = require("../validators/userValidator");
 
 const getUserInfo = async (req, res) => {
   try {
@@ -28,12 +29,22 @@ const getUserInfo = async (req, res) => {
 
 const updateUserInfo = async (req, res) => {
   try {
+    const { error, value } = updateUserValidator.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+
+    if (error) {
+      const messages = error.details.map((detail) => detail.message);
+      return res.status(400).json({ errors: messages });
+    }
+
     const userEmail = req.user.email;
 
     const user = await User.findOne({ where: { email: userEmail } });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    const { first_name, last_name, phone_number, zip_code } = req.body;
+    const { first_name, last_name, phone_number, zip_code } = value;
 
     const uploadedImages = req.cloudinaryImages;
 

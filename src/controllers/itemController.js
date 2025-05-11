@@ -4,11 +4,21 @@ const { Op } = require("sequelize");
 const { BadRequestError } = require("../errors");
 const { sequelize } = require("../models");
 const { itemSearchSchema } = require("../validators/zipValidator");
+const itemSchema = require("../validators/itemValidator");
+const itemIdParamSchema = require("../validators/itemIdParamValidator");
+const updateItemSchema = require("../validators/itemUpdateValidator");
 
 const createItem = async (req, res) => {
+  const { error, value } = itemSchema.validate(req.body, { abortEarly: false });
+
+  if (error) {
+    const messages = error.details.map((detail) => detail.message);
+    return res.status(400).json({ errors: messages });
+  }
+
   const t = await Item.sequelize.transaction();
   const { title, description, category_name, zip, item_status, can_deliver } =
-    req.body;
+    value;
   const user_email = req.user.email;
 
   const cloudinaryImages = req.cloudinaryImages;
@@ -70,6 +80,12 @@ const createItem = async (req, res) => {
 };
 
 const deleteItem = async (req, res) => {
+  const { error } = itemIdParamSchema.validate(req.params);
+  if (error) {
+    const messages = error.details.map((detail) => detail.message);
+    return res.status(400).json({ errors: messages });
+  }
+
   const { id } = req.params;
 
   try {
@@ -225,10 +241,25 @@ const getItemById = async (req, res, next) => {
 };
 
 const updateItem = async (req, res) => {
+  const { error, value } = updateItemSchema.validate(req.body, {
+    abortEarly: false,
+  });
+
+  if (error) {
+    return res.status(400).json({ error: error.details.map((e) => e.message) });
+  }
+
   const id = req.params.id;
   const userId = req.user.id;
-  const { title, description, zip, item_status, category_name, can_deliver } =
-    req.body;
+  const {
+    title,
+    description,
+    zip,
+    item_status,
+    category_name,
+    can_deliver,
+    deleteList: rawDeleteList,
+  } = value;
 
   const t = await sequelize.transaction();
 
@@ -257,7 +288,7 @@ const updateItem = async (req, res) => {
 
     // Delete selected images (if any)
 
-    let deleteList = req.body.deleteList;
+    let deleteList = rawDeleteList;
 
     if (typeof deleteList === "string") {
       try {
@@ -324,7 +355,17 @@ const updateItem = async (req, res) => {
 
     // Return updated item with images
     const updatedItem = await Item.findByPk(id, {
-      include: [{ model: Image, attributes: ["id", "image_url"] }],
+      include: [
+        {
+          model: User,
+          attributes: ["email", "first_name", "last_name", "avatar_url"],
+        },
+        {
+          model: Category,
+          attributes: ["category_name"],
+        },
+        { model: Image, attributes: ["id", "image_url"] },
+      ],
     });
 
     res.json(updatedItem);
