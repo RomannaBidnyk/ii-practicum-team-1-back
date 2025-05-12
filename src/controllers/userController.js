@@ -1,6 +1,8 @@
 const { User } = require("../models");
 const cloudinary = require("../config/cloudinaryConfig");
 const updateUserValidator = require("../validators/userValidator");
+const { BadRequestError, NotFoundError } = require("../errors");
+const { StatusCodes } = require("http-status-codes");
 
 const getUserInfo = async (req, res) => {
   try {
@@ -18,12 +20,13 @@ const getUserInfo = async (req, res) => {
       ],
     });
 
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      throw new NotFoundError("User not found");
+    }
 
-    res.status(200).json(user);
+    res.status(StatusCodes.OK).json(user);
   } catch (error) {
-    console.error("Error fetching user:", error);
-    res.status(500).json({ message: "Server error" });
+    next(error);
   }
 };
 
@@ -36,13 +39,15 @@ const updateUserInfo = async (req, res) => {
 
     if (error) {
       const messages = error.details.map((detail) => detail.message);
-      return res.status(400).json({ errors: messages });
+      throw new BadRequestError(messages.join(", "));
     }
 
     const userEmail = req.user.email;
 
     const user = await User.findOne({ where: { email: userEmail } });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      throw new NotFoundError("User not found");
+    }
 
     const { first_name, last_name, phone_number, zip_code } = value;
 
@@ -72,7 +77,7 @@ const updateUserInfo = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    res.status(StatusCodes.OK).json({
       message: "User updated successfully",
       user: {
         email: user.email,
@@ -84,8 +89,7 @@ const updateUserInfo = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error updating user:", error);
-    res.status(500).json({ message: "Server error" });
+    next(error);
   }
 };
 
