@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { UnauthenticatedError } = require("../errors");
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
@@ -7,18 +8,18 @@ const authMiddleware = (req, res, next) => {
 
   // check token
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Authentication invalid" });
+    return next(new UnauthenticatedError("Authentication invalid"));
   }
 
   const token = authHeader.split(" ")[1];
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; 
+    req.user = decoded;
     next();
   } catch (err) {
     console.error("Invalid token:", err);
-    return res.status(401).json({ message: "Invalid or expired token" });
+    return next(new UnauthenticatedError("Invalid or expired token"));
   }
 };
 

@@ -4,18 +4,17 @@ const {
 } = require("./cloudinaryMiddleware");
 const upload = require("./uploadMiddleware");
 const multer = require("multer");
+const { BadRequestError } = require("../errors");
 
 const handleMulterErrors = (req, res, next) => {
   upload.array("image")(req, res, function (err) {
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
-        return res
-          .status(400)
-          .json({ error: "File too large. Max size is 5MB." });
+        return next(new BadRequestError("File too large. Max size is 5MB."));
       }
-      return res.status(400).json({ error: err.message });
+      return next(new BadRequestError(err.message));
     } else if (err) {
-      return res.status(400).json({ error: err.message });
+      return next(new BadRequestError(err.message));
     }
     next();
   });
@@ -23,7 +22,7 @@ const handleMulterErrors = (req, res, next) => {
 
 const hasOneImage = (req, res, next) => {
   if (req.files && req.files.length > 1) {
-    return res.status(400).json({ error: "Only one image is allowed." });
+    return next(new BadRequestError("Only one image is allowed."));
   }
   next();
 };
