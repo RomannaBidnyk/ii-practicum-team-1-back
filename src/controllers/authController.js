@@ -6,13 +6,21 @@ const registerSchema = require("../validators/registerValidator");
 const loginSchema = require("../validators/loginValidator");
 const resetPasswordRequestSchema = require("../validators/resetPasswordRequestValidator");
 const resetPasswordSchema = require("../validators/resetPasswordValidator");
-const { BadRequestError, UnauthenticatedError } = require("../errors");
+const {
+  BadRequestError,
+  UnauthenticatedError,
+  LockedError,
+  ForbiddenError,
+  InternalServerError,
+  NotFoundError,
+} = require("../errors");
 const { PasswordResetToken } = require("../models");
 const { Op } = require("sequelize");
 const {
   sendPasswordResetEmail,
   sendVerificationEmail,
 } = require("../services/emailService");
+const { StatusCodes } = require("http-status-codes");
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
@@ -20,7 +28,7 @@ const authController = {
   async register(req, res, next) {
     const { error, value } = registerSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ message: error.details[0].message });
+      return next(new BadRequestError(error.details[0].message));
     }
 
     let { email, password, first_name, last_name, phone_number, zip_code } =
@@ -57,7 +65,7 @@ const authController = {
         ...userWithoutPassword
       } = newUser.toJSON();
 
-      res.status(201).json({
+      res.status(StatusCodes.CREATED).json({
         message:
           "User registered successfully. Please check your email to verify your account.",
         user: userWithoutPassword,
@@ -81,9 +89,7 @@ const authController = {
       });
 
       if (!user) {
-        return res
-          .status(400)
-          .json({ message: "Invalid or expired verification token" });
+        throw new BadRequestError("Invalid or expired verification token");
       }
 
       await user.update({
@@ -92,7 +98,7 @@ const authController = {
       });
 
       res
-        .status(200)
+        .status(StatusCodes.OK)
         .json({ message: "Email verified successfully! You can now login." });
     } catch (err) {
       console.error("Email verification error:", err);
@@ -103,7 +109,7 @@ const authController = {
   async login(req, res, next) {
     const { error, value } = loginSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ message: error.details[0].message });
+      return next(new BadRequestError(error.details[0].message));
     }
 
     const { email, password } = value;
@@ -116,15 +122,11 @@ const authController = {
       }
 
       if (user.locked_until && user.locked_until > new Date()) {
-        return res.status(423).json({
-          message: "Account is locked. Please try again later.",
-        });
+        throw new LockedError("Account is locked. Please try again later.");
       }
 
       if (!user.is_verified) {
-        return res.status(403).json({
-          message: "Please verify your email before logging in.",
-        });
+        throw new ForbiddenError("Please verify your email before logging in.");
       }
 
       const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -159,7 +161,7 @@ const authController = {
         ...userWithoutPassword
       } = user.toJSON();
 
-      res.status(200).json({
+      res.status(StatusCodes.OK).json({
         message: "Login successful",
         user: userWithoutPassword,
         token,
@@ -173,7 +175,7 @@ const authController = {
   async requestPasswordReset(req, res, next) {
     const { error, value } = resetPasswordRequestSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ message: error.details[0].message });
+      return next(new BadRequestError(error.details[0].message));
     }
 
     const { email } = value;
@@ -183,7 +185,7 @@ const authController = {
       const responseMessage =
         "If your email exists in our system, you will receive reset instructions.";
       if (!user) {
-        return res.status(200).json({ message: responseMessage });
+        return res.status(StatusCodes.OK).json({ message: responseMessage });
       }
 
       const resetToken = crypto.randomBytes(32).toString("hex");
@@ -207,7 +209,7 @@ const authController = {
       // Send email
       await sendPasswordResetEmail(email, resetUrl);
 
-      return res.status(200).json({ message: responseMessage });
+      return res.status(StatusCodes.OK).json({ message: responseMessage });
     } catch (err) {
       console.error("Password reset request error:", err);
       next(err);
@@ -217,7 +219,7 @@ const authController = {
   async resetPassword(req, res, next) {
     const { error, value } = resetPasswordSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ message: error.details[0].message });
+      return next(new BadRequestError(error.details[0].message));
     }
 
     const { token, newPassword } = value;
@@ -236,26 +238,24 @@ const authController = {
       });
 
       if (!resetToken) {
-        return res.status(400).json({
-          message:
-            "This password reset link is invalid or has expired. Please request a new one.",
-        });
+        throw new BadRequestError(
+          "This password reset link is invalid or has expired. Please request a new one."
+        );
       }
 
       const userEmail = resetToken.email;
 
       const user = await User.findByPk(userEmail);
       if (!user) {
-        return res
-          .status(404)
-          .json({ message: "User account not found. Please contact support." });
+        throw new NotFoundError(
+          "User account not found. Please contact support."
+        );
       }
 
       if (await bcrypt.compare(newPassword, user.password)) {
-        return res.status(400).json({
-          message:
-            "Your new password cannot be the same as your current password. Please choose a different password.",
-        });
+        throw new BadRequestError(
+          "Your new password cannot be the same as your current password. Please choose a different password."
+        );
       }
 
       const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -265,16 +265,17 @@ const authController = {
         where: { email: userEmail },
       });
 
-      return res.status(200).json({
+      return res.status(StatusCodes.OK).json({
         message:
           "Your password has been successfully reset. You can now log in with your new password.",
       });
     } catch (err) {
       console.error("Password reset error:", err);
-      return res.status(500).json({
-        message:
-          "An error occurred while resetting your password. Please try again or contact support.",
-      });
+      const customError = new InternalServerError(
+        "An error occurred while resetting your password. Please try again or contact support."
+      );
+      customError.originalError = error;
+      return next(customError);
     }
   },
 };
