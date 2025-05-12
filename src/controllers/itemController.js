@@ -19,7 +19,7 @@ const createItem = async (req, res, next) => {
 
   if (error) {
     const messages = error.details.map((detail) => detail.message);
-    return next(new BadRequestError(messages.join(", ")));
+    return next(new BadRequestError(messages.join("; ")));
   }
 
   const t = await Item.sequelize.transaction();
@@ -95,7 +95,7 @@ const deleteItem = async (req, res, next) => {
   const { error } = itemIdParamSchema.validate(req.params);
   if (error) {
     const messages = error.details.map((detail) => detail.message);
-    return next(new BadRequestError(messages.join(", ")));
+    return next(new BadRequestError(messages.join("; ")));
   }
 
   const { id } = req.params;
@@ -269,7 +269,7 @@ const updateItem = async (req, res, next) => {
 
   if (error) {
     const messages = error.details.map((detail) => detail.message);
-    return next(new BadRequestError(messages.join(", ")));
+    return next(new BadRequestError(messages.join("; ")));
   }
 
   const id = req.params.id;

@@ -28,7 +28,10 @@ const getUserInfo = async (req, res, next) => {
 
     res.status(StatusCodes.OK).json(user);
   } catch (error) {
-    next(error);
+    console.error("Error fetching user:", error);
+    const customError = new InternalServerError("Failed to fetch  info");
+    customError.originalError = error;
+    return next(customError);
   }
 };
 
@@ -41,7 +44,7 @@ const updateUserInfo = async (req, res, next) => {
 
     if (error) {
       const messages = error.details.map((detail) => detail.message);
-      throw new BadRequestError(messages.join(", "));
+      throw new BadRequestError(messages.join("; "));
     }
 
     const userEmail = req.user.email;
@@ -91,7 +94,10 @@ const updateUserInfo = async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(error);
+    console.error("Error updating user:", error);
+    const customError = new InternalServerError("Failed to update user info");
+    customError.originalError = error;
+    return next(customError);
   }
 };
 
