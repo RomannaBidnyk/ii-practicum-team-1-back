@@ -1,6 +1,8 @@
 const { User } = require("../models");
 const cloudinary = require("../config/cloudinaryConfig");
-const updateUserValidator = require("../validators/userValidator");
+const {
+  userInfoSchema: updateUserValidator,
+} = require("../validators/userValidator");
 
 const getUserInfo = async (req, res) => {
   try {
