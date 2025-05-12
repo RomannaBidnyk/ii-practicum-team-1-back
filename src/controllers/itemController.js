@@ -90,7 +90,7 @@ const deleteItem = async (req, res, next) => {
   const { error } = itemIdParamSchema.validate(req.params);
   if (error) {
     const messages = error.details.map((detail) => detail.message);
-    return res.status(400).json({ errors: messages });
+    return next(new BadRequestError(messages.join(", ")));
   }
 
   const { id } = req.params;
@@ -102,24 +102,26 @@ const deleteItem = async (req, res, next) => {
     });
 
     if (!item) {
-      return res.status(404).json({ error: "Item not found" });
+      return next(new NotFoundError("Item not found"));
     }
 
     console.log("Item with images:", item);
 
     // Check if the authenticated user owns the item
     if (req.user.email !== item.user_email) {
-      return res
-        .status(403)
-        .json({ error: "Unauthorized to delete this item" });
+      return next(new ForbiddenError("Unauthorized to delete this item"));
     }
 
     // Delete all associated images from Cloudinary
-    await Promise.all(
-      item.images.map((img) =>
-        cloudinary.uploader.destroy(img.dataValues.public_id)
-      )
-    );
+    try {
+      await Promise.all(
+        item.images.map((img) =>
+          cloudinary.uploader.destroy(img.dataValues.public_id)
+        )
+      );
+    } catch (cloudErr) {
+      console.error("Cloudinary deletion error:", cloudErr);
+    }
 
     await Image.destroy({ where: { item_id: id } });
     await Item.destroy({ where: { item_id: id } });
@@ -129,7 +131,9 @@ const deleteItem = async (req, res, next) => {
       .json({ message: "Item deleted successfully" });
   } catch (error) {
     console.error("Error deleting item:", error);
-    return res.status(500).json({ error: "Failed to delete item" });
+    const customError = new InternalServerError("Failed to delete item");
+    customError.originalError = error;
+    return next(customError);
   }
 };
 
