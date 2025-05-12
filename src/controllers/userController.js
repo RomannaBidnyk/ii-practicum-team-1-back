@@ -6,7 +6,7 @@ const {
 const { BadRequestError, NotFoundError } = require("../errors");
 const { StatusCodes } = require("http-status-codes");
 
-const getUserInfo = async (req, res) => {
+const getUserInfo = async (req, res, next) => {
   try {
     const userEmail = req.user.email;
 
@@ -32,7 +32,7 @@ const getUserInfo = async (req, res) => {
   }
 };
 
-const updateUserInfo = async (req, res) => {
+const updateUserInfo = async (req, res, next) => {
   try {
     const { error, value } = updateUserValidator.validate(req.body, {
       abortEarly: false,

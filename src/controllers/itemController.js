@@ -1,19 +1,20 @@
 const { Item, User, Category, Image } = require("../models");
 const cloudinary = require("../config/cloudinaryConfig");
 const { Op } = require("sequelize");
-const { BadRequestError } = require("../errors");
+const { BadRequestError, InternalServerError } = require("../errors");
 const { sequelize } = require("../models");
 const { itemSearchSchema } = require("../validators/zipValidator");
 const itemSchema = require("../validators/itemValidator");
 const itemIdParamSchema = require("../validators/itemIdParamValidator");
 const updateItemSchema = require("../validators/itemUpdateValidator");
+const { StatusCodes } = require("http-status-codes");
 
-const createItem = async (req, res) => {
+const createItem = async (req, res, next) => {
   const { error, value } = itemSchema.validate(req.body, { abortEarly: false });
 
   if (error) {
     const messages = error.details.map((detail) => detail.message);
-    return res.status(400).json({ errors: messages });
+    return next(new BadRequestError(messages.join(", ")));
   }
 
   const t = await Item.sequelize.transaction();
@@ -24,7 +25,7 @@ const createItem = async (req, res) => {
   const cloudinaryImages = req.cloudinaryImages;
 
   if (!cloudinaryImages || !cloudinaryImages.length) {
-    return res.status(400).json({ error: "Image upload failed." });
+    return next(new BadRequestError("Image upload failed."));
   }
 
   try {
@@ -55,7 +56,7 @@ const createItem = async (req, res) => {
     );
 
     await t.commit();
-    return res.status(201).json({
+    return res.status(StatusCodes.CREATED).json({
       message: "Item created successfully",
       item,
       images: cloudinaryImages.map((img) => img.secure_url),
@@ -65,21 +66,27 @@ const createItem = async (req, res) => {
     await t.rollback();
 
     // Clean up any uploaded images
+    let cleanupError = null;
     try {
       await Promise.all(
         cloudinaryImages.map((img) =>
           cloudinary.uploader.destroy(img.public_id)
         )
       );
-    } catch (cleanupError) {
-      console.error("Error during Cloudinary cleanup:", cleanupError);
+    } catch (cleanupErrorCaught) {
+      console.error("Error during Cloudinary cleanup:", cleanupErrorCaught);
+      cleanupError = cleanupErrorCaught;
     }
-
-    return res.status(500).json({ error: "Failed to create item" });
+    const customError = new InternalServerError("Failed to create item");
+    customError.originalError = err;
+    if (cleanupError) {
+      customError.cleanupError = cleanupError;
+    }
+    return next(customError);
   }
 };
 
-const deleteItem = async (req, res) => {
+const deleteItem = async (req, res, next) => {
   const { error } = itemIdParamSchema.validate(req.params);
   if (error) {
     const messages = error.details.map((detail) => detail.message);
@@ -117,7 +124,9 @@ const deleteItem = async (req, res) => {
     await Image.destroy({ where: { item_id: id } });
     await Item.destroy({ where: { item_id: id } });
 
-    return res.status(200).json({ message: "Item deleted successfully" });
+    return res
+      .status(StatusCodes.OK)
+      .json({ message: "Item deleted successfully" });
   } catch (error) {
     console.error("Error deleting item:", error);
     return res.status(500).json({ error: "Failed to delete item" });
@@ -180,7 +189,7 @@ const getAllItems = async (req, res, next) => {
     const totalPages = Math.ceil(totalItems / limit);
     const currentPage = Math.floor(offset / limit) + 1;
 
-    return res.status(200).json({
+    return res.status(StatusCodes.OK).json({
       items,
       count: items.length,
       pagination: {
@@ -233,14 +242,14 @@ const getItemById = async (req, res, next) => {
       return res.status(404).json({ error: "Item not found" });
     }
 
-    return res.status(200).json({ item });
+    return res.status(StatusCodes.OK).json({ item });
   } catch (err) {
     console.error("Error fetching item:", err);
     next(err);
   }
 };
 
-const updateItem = async (req, res) => {
+const updateItem = async (req, res, next) => {
   const { error, value } = updateItemSchema.validate(req.body, {
     abortEarly: false,
   });
