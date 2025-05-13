@@ -3,8 +3,10 @@ const cloudinary = require("../config/cloudinaryConfig");
 const {
   userInfoSchema: updateUserValidator,
 } = require("../validators/userValidator");
+const { BadRequestError, NotFoundError } = require("../errors");
+const { StatusCodes } = require("http-status-codes");
 
-const getUserInfo = async (req, res) => {
+const getUserInfo = async (req, res, next) => {
   try {
     const userEmail = req.user.email;
 
@@ -20,16 +22,20 @@ const getUserInfo = async (req, res) => {
       ],
     });
 
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      throw new NotFoundError("User not found");
+    }
 
-    res.status(200).json(user);
+    res.status(StatusCodes.OK).json(user);
   } catch (error) {
     console.error("Error fetching user:", error);
-    res.status(500).json({ message: "Server error" });
+    const customError = new InternalServerError("Failed to fetch  info");
+    customError.originalError = error;
+    return next(customError);
   }
 };
 
-const updateUserInfo = async (req, res) => {
+const updateUserInfo = async (req, res, next) => {
   try {
     const { error, value } = updateUserValidator.validate(req.body, {
       abortEarly: false,
@@ -38,13 +44,15 @@ const updateUserInfo = async (req, res) => {
 
     if (error) {
       const messages = error.details.map((detail) => detail.message);
-      return res.status(400).json({ errors: messages });
+      throw new BadRequestError(messages.join("; "));
     }
 
     const userEmail = req.user.email;
 
     const user = await User.findOne({ where: { email: userEmail } });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      throw new NotFoundError("User not found");
+    }
 
     const { first_name, last_name, phone_number, zip_code } = value;
 
@@ -74,7 +82,7 @@ const updateUserInfo = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    res.status(StatusCodes.OK).json({
       message: "User updated successfully",
       user: {
         email: user.email,
@@ -87,7 +95,9 @@ const updateUserInfo = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating user:", error);
-    res.status(500).json({ message: "Server error" });
+    const customError = new InternalServerError("Failed to update user info");
+    customError.originalError = error;
+    return next(customError);
   }
 };
 

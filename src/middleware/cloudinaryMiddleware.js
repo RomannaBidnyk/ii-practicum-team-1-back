@@ -1,5 +1,5 @@
 const cloudinary = require("../config/cloudinaryConfig");
-
+const { BadRequestError, InternalServerError } = require("../errors");
 /**
  * Requires req.file (must be used after multer middleware)
  */
@@ -14,7 +14,7 @@ const uploadImageMiddleware = async (req, res, next) => {
     }
 
     if (!files || files.length === 0) {
-      return res.status(400).json({ error: "At least one image is required." });
+      throw new BadRequestError("At least one image is required.");
     }
 
     const cloudinaryUploads = await Promise.all(
@@ -33,7 +33,9 @@ const uploadImageMiddleware = async (req, res, next) => {
     next(); // continue to the next middleware or route handler
   } catch (error) {
     console.error("Cloudinary upload error:", error);
-    res.status(500).json({ error: "Failed to upload image" });
+    const customError = new InternalServerError("Failed to upload image");
+    customError.originalError = error;
+    return next(customError);
   }
 };
 
@@ -41,9 +43,7 @@ const deleteImageMiddleware = async (req, res, next) => {
   const { public_id } = req.body;
 
   if (!public_id) {
-    return res
-      .status(400)
-      .json({ error: "public_id is required to delete image" });
+    return next(new BadRequestError("public_id is required to delete image"));
   }
 
   try {
@@ -51,7 +51,9 @@ const deleteImageMiddleware = async (req, res, next) => {
     next(); // continue to the next middleware or route handler
   } catch (error) {
     console.error("Cloudinary deletion error:", error);
-    res.status(500).json({ error: "Failed to delete image" });
+    const customError = new InternalServerError("Failed to delete image");
+    customError.originalError = error;
+    next(customError);
   }
 };
 

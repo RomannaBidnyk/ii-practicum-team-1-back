@@ -1,19 +1,25 @@
 const { Item, User, Category, Image } = require("../models");
 const cloudinary = require("../config/cloudinaryConfig");
 const { Op } = require("sequelize");
-const { BadRequestError } = require("../errors");
+const {
+  BadRequestError,
+  InternalServerError,
+  NotFoundError,
+  ForbiddenError,
+} = require("../errors");
 const { sequelize } = require("../models");
 const { itemSearchSchema } = require("../validators/zipValidator");
 const itemSchema = require("../validators/itemValidator");
 const itemIdParamSchema = require("../validators/itemIdParamValidator");
 const updateItemSchema = require("../validators/itemUpdateValidator");
+const { StatusCodes } = require("http-status-codes");
 
-const createItem = async (req, res) => {
+const createItem = async (req, res, next) => {
   const { error, value } = itemSchema.validate(req.body, { abortEarly: false });
 
   if (error) {
     const messages = error.details.map((detail) => detail.message);
-    return res.status(400).json({ errors: messages });
+    return next(new BadRequestError(messages.join("; ")));
   }
 
   const t = await Item.sequelize.transaction();
@@ -24,7 +30,7 @@ const createItem = async (req, res) => {
   const cloudinaryImages = req.cloudinaryImages;
 
   if (!cloudinaryImages || !cloudinaryImages.length) {
-    return res.status(400).json({ error: "Image upload failed." });
+    return next(new BadRequestError("Image upload failed."));
   }
 
   try {
@@ -55,7 +61,7 @@ const createItem = async (req, res) => {
     );
 
     await t.commit();
-    return res.status(201).json({
+    return res.status(StatusCodes.CREATED).json({
       message: "Item created successfully",
       item,
       images: cloudinaryImages.map((img) => img.secure_url),
@@ -65,25 +71,31 @@ const createItem = async (req, res) => {
     await t.rollback();
 
     // Clean up any uploaded images
+    let cleanupError = null;
     try {
       await Promise.all(
         cloudinaryImages.map((img) =>
           cloudinary.uploader.destroy(img.public_id)
         )
       );
-    } catch (cleanupError) {
-      console.error("Error during Cloudinary cleanup:", cleanupError);
+    } catch (cleanupErrorCaught) {
+      console.error("Error during Cloudinary cleanup:", cleanupErrorCaught);
+      cleanupError = cleanupErrorCaught;
     }
-
-    return res.status(500).json({ error: "Failed to create item" });
+    const customError = new InternalServerError("Failed to create item");
+    customError.originalError = err;
+    if (cleanupError) {
+      customError.cleanupError = cleanupError;
+    }
+    return next(customError);
   }
 };
 
-const deleteItem = async (req, res) => {
+const deleteItem = async (req, res, next) => {
   const { error } = itemIdParamSchema.validate(req.params);
   if (error) {
     const messages = error.details.map((detail) => detail.message);
-    return res.status(400).json({ errors: messages });
+    return next(new BadRequestError(messages.join("; ")));
   }
 
   const { id } = req.params;
@@ -95,32 +107,38 @@ const deleteItem = async (req, res) => {
     });
 
     if (!item) {
-      return res.status(404).json({ error: "Item not found" });
+      return next(new NotFoundError("Item not found"));
     }
 
     console.log("Item with images:", item);
 
     // Check if the authenticated user owns the item
     if (req.user.email !== item.user_email) {
-      return res
-        .status(403)
-        .json({ error: "Unauthorized to delete this item" });
+      return next(new ForbiddenError("Unauthorized to delete this item"));
     }
 
     // Delete all associated images from Cloudinary
-    await Promise.all(
-      item.images.map((img) =>
-        cloudinary.uploader.destroy(img.dataValues.public_id)
-      )
-    );
+    try {
+      await Promise.all(
+        item.images.map((img) =>
+          cloudinary.uploader.destroy(img.dataValues.public_id)
+        )
+      );
+    } catch (cloudErr) {
+      console.error("Cloudinary deletion error:", cloudErr);
+    }
 
     await Image.destroy({ where: { item_id: id } });
     await Item.destroy({ where: { item_id: id } });
 
-    return res.status(200).json({ message: "Item deleted successfully" });
+    return res
+      .status(StatusCodes.OK)
+      .json({ message: "Item deleted successfully" });
   } catch (error) {
     console.error("Error deleting item:", error);
-    return res.status(500).json({ error: "Failed to delete item" });
+    const customError = new InternalServerError("Failed to delete item");
+    customError.originalError = error;
+    return next(customError);
   }
 };
 
@@ -129,7 +147,7 @@ const getAllItems = async (req, res, next) => {
     const { error, value } = itemSearchSchema.validate(req.query);
 
     if (error) {
-      return res.status(400).json({ message: error.details[0].message });
+      return next(new BadRequestError(error.details[0].message));
     }
 
     const { category, search, zip, limit, offset } = value;
@@ -180,7 +198,7 @@ const getAllItems = async (req, res, next) => {
     const totalPages = Math.ceil(totalItems / limit);
     const currentPage = Math.floor(offset / limit) + 1;
 
-    return res.status(200).json({
+    return res.status(StatusCodes.OK).json({
       items,
       count: items.length,
       pagination: {
@@ -199,7 +217,9 @@ const getAllItems = async (req, res, next) => {
     });
   } catch (err) {
     console.error("Error fetching items:", err);
-    next(err);
+    const customError = new InternalServerError("Failed to fetch item");
+    customError.originalError = err;
+    return next(customError);
   }
 };
 
@@ -209,7 +229,7 @@ const getItemById = async (req, res, next) => {
 
     const itemId = parseInt(id, 10);
     if (isNaN(itemId)) {
-      return res.status(400).json({ error: "Item ID must be a number" });
+      return next(new BadRequestError("Item ID must be a number"));
     }
 
     const item = await Item.findByPk(itemId, {
@@ -230,27 +250,30 @@ const getItemById = async (req, res, next) => {
     });
 
     if (!item) {
-      return res.status(404).json({ error: "Item not found" });
+      return next(new NotFoundError("Item not found"));
     }
 
-    return res.status(200).json({ item });
+    return res.status(StatusCodes.OK).json({ item });
   } catch (err) {
     console.error("Error fetching item:", err);
-    next(err);
+    const customError = new InternalServerError("Failed to fetch item");
+    customError.originalError = err;
+    return next(customError);
   }
 };
 
-const updateItem = async (req, res) => {
+const updateItem = async (req, res, next) => {
   const { error, value } = updateItemSchema.validate(req.body, {
     abortEarly: false,
   });
 
   if (error) {
-    return res.status(400).json({ error: error.details.map((e) => e.message) });
+    const messages = error.details.map((detail) => detail.message);
+    return next(new BadRequestError(messages.join("; ")));
   }
 
   const id = req.params.id;
-  const userId = req.user.id;
+  const userEmail = req.user.email;
   const {
     title,
     description,
@@ -269,25 +292,25 @@ const updateItem = async (req, res) => {
     });
 
     if (!item) {
-      return res.status(404).json({ error: "Item not found" });
+      await t.rollback();
+      return next(new NotFoundError("Item not found"));
     }
 
-    if (item.user_id !== userId) {
-      return res
-        .status(403)
-        .json({ error: "You can only update your own items" });
+    if (item.user_email !== userEmail) {
+      await t.rollback();
+      return next(new ForbiddenError("You can only update your own items"));
     }
 
     let category = null;
     if (category_name) {
       category = await Category.findOne({ where: { category_name } });
       if (!category) {
-        return res.status(400).json({ error: "Invalid category" });
+        await t.rollback();
+        return next(new BadRequestError("Invalid category"));
       }
     }
 
     // Delete selected images (if any)
-
     let deleteList = rawDeleteList;
 
     if (typeof deleteList === "string") {
@@ -295,26 +318,34 @@ const updateItem = async (req, res) => {
         deleteList = JSON.parse(deleteList);
       } catch (e) {
         console.error("Failed to parse deleteList:", e);
-        deleteList = [];
+        return next(new BadRequestError("Invalid format for deleteList"));
       }
     }
 
     console.log("Images ids to delete:", deleteList);
     if (deleteList && Array.isArray(deleteList)) {
       const imagesToDelete = item.images.filter((img) => {
-        const isInDeleteList = deleteList.includes(img.id);
-        return isInDeleteList;
+        return deleteList.includes(img.id);
       });
       if (imagesToDelete.length !== deleteList.length) {
-        return res
-          .status(400)
-          .json({ error: "Some images to delete do not belong to this item." });
+        await t.rollback();
+        return next(
+          new BadRequestError(
+            "One or more specified image IDs do not belong to this item"
+          )
+        );
       }
 
       // Delete from Cloudinary
-      await Promise.all(
-        imagesToDelete.map((img) => cloudinary.uploader.destroy(img.public_id))
-      );
+      try {
+        await Promise.all(
+          imagesToDelete.map((img) =>
+            cloudinary.uploader.destroy(img.public_id)
+          )
+        );
+      } catch (cloudErr) {
+        console.error("Cloudinary deletion error:", cloudErr);
+      }
 
       // Delete from DB
       await Image.destroy({
@@ -368,11 +399,13 @@ const updateItem = async (req, res) => {
       ],
     });
 
-    res.json(updatedItem);
+    return res.status(StatusCodes.OK).json(updatedItem);
   } catch (error) {
     await t.rollback();
     console.error("Update item error:", error);
-    res.status(500).json({ error: "Failed to update item" });
+    const internalErr = new InternalServerError("Failed to update item");
+    internalErr.originalError = err;
+    return next(internalErr);
   }
 };
 
