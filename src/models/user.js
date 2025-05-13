@@ -21,6 +21,7 @@ module.exports = (sequelize) => {
       locked_until: { type: DataTypes.DATE },
       avatar_url: { type: DataTypes.STRING, allowNull: true },
       avatar_public_id: { type: DataTypes.STRING, allowNull: true },
+      google_id: { type: DataTypes.STRING, allowNull: true },
     },
     { timestamps: true }
   );
