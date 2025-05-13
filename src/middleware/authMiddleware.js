@@ -6,7 +6,6 @@ const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
-  // check token
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return next(new UnauthenticatedError("Authentication invalid"));
   }
