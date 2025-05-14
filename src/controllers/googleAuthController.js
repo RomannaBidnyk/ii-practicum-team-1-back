@@ -18,20 +18,12 @@ const googleAuthController = {
       let user = await User.findByPk(email);
 
       if (!user) {
-        const randomPassword = crypto.randomBytes(16).toString("hex");
+        return res.redirect(
+          `${process.env.FRONTEND_URL}/login?error=user_not_found&message=Please register first`
+        );
+      }
 
-        user = await User.create({
-          email,
-          password: randomPassword,
-          first_name: firstName || "Google",
-          last_name: lastName || "User",
-          phone_number: "0000000000",
-          zip_code: "00000",
-          is_verified: true,
-          avatar_url: picture,
-          google_id: req.user.id,
-        });
-      } else if (!user.google_id) {
+      if (!user.google_id) {
         await user.update({
           google_id: req.user.id,
           is_verified: true,
@@ -55,7 +47,6 @@ const googleAuthController = {
       }/login?${params.toString()}`;
       res.redirect(redirectUrl);
     } catch (error) {
-      console.error("Google authentication error:", error);
       res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
     }
   },
