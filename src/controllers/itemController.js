@@ -150,9 +150,13 @@ const getAllItems = async (req, res, next) => {
       return next(new BadRequestError(error.details[0].message));
     }
 
-    const { category, search, zip, limit, offset } = value;
+    const { category, search, zip, limit, offset, self } = value;
 
     const whereConditions = {};
+
+        if (self === true) {
+      whereConditions.user_email = req.user.email; //email from JWT token
+    }
 
     if (category) {
       whereConditions.category_name = category;
@@ -213,6 +217,7 @@ const getAllItems = async (req, res, next) => {
         category: category || null,
         search: search || null,
         zip: zip || null,
+        self: self || null,
       },
     });
   } catch (err) {
