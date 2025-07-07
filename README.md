@@ -22,6 +22,8 @@ You can explore the app using the following test user account:
 - **Email:** test_user@example.com  
 - **Password:** TestPassword123
 
+---
+
 ### Setting up local development environment
 
 1. Create a folder to contain both the front-end and back-end repos 
