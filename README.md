@@ -1,12 +1,17 @@
 # Back-End Repo for Node/React Practicum
 
-This will be the API for the front-end React app part of your practicum project.
+## 🖼️ Screenshots
+### 🏠 Home Page
+![Home Page](images/KindNet_main_page.JPG)
 
-These instructions are for the **front-end team** so they can setup their local development environment to run 
-both the back-end server and their front-end app. You can go through these steps during your first group meeting 
-in case you need assistance from your mentors.
+### 📦 Items Page
+![Items Page](images/kindnet_all_items.JPG)
 
->The back-end server will be running on port 8000. The front-end app will be running on port 3000. You will need to run both the back-end server and the front-end app at the same time to test your app.
+### 🔍 Single Item View
+![Single Item](images/kindnet_item.JPG)
+
+### 👤 User Profile
+![Profile Page](images/kindnet_profile.JPG)
 
 ### Setting up local development environment
 
